@@ -1,0 +1,7 @@
+apps:
+  - name: ranger_iam
+    command: ./ranger_iam
+  - name: memnexus
+    command: ./memnexus
+  - name: utils
+    command: ./utils/utils.kenv
