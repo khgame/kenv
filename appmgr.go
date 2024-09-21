@@ -13,9 +13,11 @@ import (
 
 // AppConfig 结构体用于表示配置文件中的应用程序信息
 type AppConfig struct {
-	Name       string `yaml:"name"`
-	Executable string `yaml:"executable"`
-	Args       string `yaml:"args"`
+	Name        string `yaml:"name"`
+	Executable  string `yaml:"executable"`
+	Args        string `yaml:"args"`
+	RunDir      string `yaml:"run_dir"`
+	LogFilePath string `yaml:"log_file_path"`
 }
 
 // Config 结构体用于表示整个配置文件
@@ -31,10 +33,12 @@ type ProcessInfo struct {
 
 // App 结构体用于表示一个应用程序
 type App struct {
-	Name       string
-	Executable string
-	Args       string
-	Pid        int
+	Name        string
+	Executable  string
+	Args        string
+	Pid         int
+	RunDir      string
+	LogFilePath string
 }
 
 // AppManager 结构体用于管理所有应用程序
@@ -79,9 +83,11 @@ func (am *AppManager) AddApp(appConfig AppConfig) {
 	am.mu.Lock()
 	defer am.mu.Unlock()
 	am.Apps[appConfig.Name] = &App{
-		Name:       appConfig.Name,
-		Executable: appConfig.Executable,
-		Args:       appConfig.Args,
+		Name:        appConfig.Name,
+		Executable:  appConfig.Executable,
+		Args:        appConfig.Args,
+		RunDir:      appConfig.RunDir,
+		LogFilePath: appConfig.LogFilePath,
 	}
 }
 
@@ -157,6 +163,37 @@ func (am *AppManager) MatchAppNames(patterns []string) []string {
 		}
 	}
 	return uniqueStrings(matchedNames)
+}
+
+// pathToDetectedLogFile 确定日志文件路径
+func (am *AppManager) pathToDetectedLogFile(appName string) (logFile string) {
+	// 不加锁，外部调用者加锁
+	app, ok := am.Apps[appName]
+	if !ok {
+		return ""
+	}
+
+	// 确定日志文件路径
+	if app.LogFilePath != "" {
+		// 优先使用配置中的日志文件路径
+		if filepath.IsAbs(app.LogFilePath) {
+			logFile = app.LogFilePath // 绝对路径
+		} else {
+			if app.RunDir != "" {
+				logFile = filepath.Join(app.RunDir, app.LogFilePath) // 相对路径 + runDir
+			} else {
+				logFile = app.LogFilePath // 直接使用相对路径
+			}
+		}
+	} else {
+		// 没有配置 logFile，兜底到 runDir + ./logs
+		if app.RunDir != "" {
+			logFile = filepath.Join(app.RunDir, "log") // runDir + ./log
+		} else {
+			logFile = "./log" // 直接 ./log
+		}
+	}
+	return logFile
 }
 
 // uniqueStrings 辅助函数：去重字符串切片

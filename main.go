@@ -85,17 +85,22 @@ func (am *AppManager) StartApp(name string) error {
 		return fmt.Errorf("app %s is already running", name)
 	}
 
+	// 设置日志文件路径
+	logFilePath := filepath.Join(app.RunDir, "log", fmt.Sprintf("%s.log", app.Name))
+
+	// 设置工作目录为指定的运行路径
 	cmd := exec.Command(app.Executable, strings.Fields(app.Args)...)
+	cmd.Dir = app.RunDir // 指定运行路径
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	log.Printf("Starting %s with command: %s", app.Name, cmd.String())
+
 	err := cmd.Start()
 	if err != nil {
 		return err
 	}
 
 	app.Pid = cmd.Process.Pid
-	log.Printf("Started %s with PID %d", app.Name, app.Pid)
+	log.Printf("Started %s with PID %d, logging to %s", app.Name, app.Pid, logFilePath)
 
 	am.saveProcessInfo()
 	return nil
@@ -168,7 +173,14 @@ func (am *AppManager) MonitorApps() {
 
 // TailLog 查看指定应用程序的日志
 func (am *AppManager) TailLog(name string) error {
-	logFile := filepath.Join("logs", name+".log")
+	am.mu.Lock()
+	defer am.mu.Unlock()
+	// 确定日志文件路径
+	logFile := am.pathToDetectedLogFile(name)
+	if logFile == "" {
+		return fmt.Errorf("failed to determine log file path for %s", name)
+	}
+
 	cmd := exec.Command("tail", "-f", "-n", "1000", logFile)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

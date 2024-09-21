@@ -6,5 +6,6 @@ apps:
     executable: ./memnexus
     args:
   - name: utils
-    executable: ./utils/utils.kenv
-    args: ./utils
+    executable: ./utils.kenv
+    run_dir: ./utils
+    log_file_path: ./log/utils.kenv.log
