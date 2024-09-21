@@ -1,7 +1,10 @@
 apps:
   - name: ranger_iam
-    command: ./ranger_iam
+    executable: ./ranger_iam
+    args:
   - name: memnexus
-    command: ./memnexus
+    executable: ./memnexus
+    args:
   - name: utils
-    command: ./utils/utils.kenv
+    executable: ./utils/utils.kenv
+    args: ./utils
