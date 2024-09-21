@@ -16,7 +16,7 @@ all: build upload
 .PHONY: build
 build:
 	@echo "Building ..."
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO_CMD) build -o ./output/$(BIN_NAME) ./app_manager.go
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO_CMD) build -o ./output/$(BIN_NAME) .
 	@echo "Copying kenv.conf.yml to output directory..."
 	mkdir -p output
 	cp ./kenv.conf.yml ./output/ # Copy kenv.conf.yml to output directory
