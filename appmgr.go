@@ -1,13 +1,15 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
 
+	"github.com/khicago/irr"
+	"github.com/khicago/wlog"
 	"gopkg.in/yaml.v2"
 )
 
@@ -59,29 +61,36 @@ func NewAppManager() *AppManager {
 }
 
 // LoadConfig 从配置文件加载应用程序信息
-func (am *AppManager) LoadConfig(configFile string) error {
+func (am *AppManager) LoadConfig(ctx context.Context, configFile string) error {
+	log := wlog.From(ctx, "LoadConfig")
+	log.Tracef("从配置文件加载应用程序信息\n")
 	data, err := os.ReadFile(configFile)
 	if err != nil {
-		return fmt.Errorf("error reading config file: %v", err)
+		log.Errorf("读取配置文件失败: %v\n", err)
+		return irr.Error("error reading config file: %v", err)
 	}
 
 	var config Config
 	err = yaml.Unmarshal(data, &config)
 	if err != nil {
-		return fmt.Errorf("error parsing config file: %v", err)
+		log.Errorf("解析配置文件失败: %v\n", err)
+		return irr.Error("error parsing config file: %v", err)
 	}
 
 	for _, appConfig := range config.Apps {
-		am.AddApp(appConfig)
+		am.AddApp(ctx, appConfig)
 	}
 
 	return nil
 }
 
 // AddApp 添加一个新的应用程序到管理器
-func (am *AppManager) AddApp(appConfig AppConfig) {
+func (am *AppManager) AddApp(ctx context.Context, appConfig AppConfig) {
+	log := wlog.From(ctx, "AddApp")
+	log.Tracef("添加一个新的应用程序到管理器\n")
 	am.mu.Lock()
 	defer am.mu.Unlock()
+
 	am.Apps[appConfig.Name] = &App{
 		Name:        appConfig.Name,
 		Executable:  appConfig.Executable,
@@ -92,7 +101,9 @@ func (am *AppManager) AddApp(appConfig AppConfig) {
 }
 
 // SaveProcessInfo 保存进程信息到文件
-func (am *AppManager) SaveProcessInfo() error {
+func (am *AppManager) SaveProcessInfo(ctx context.Context) error {
+	log := wlog.From(ctx, "SaveProcessInfo")
+	log.Tracef("保存进程信息到文件\n")
 	data := make(map[string]ProcessInfo)
 	for name, app := range am.Apps {
 		if app.Pid != 0 {
@@ -105,34 +116,42 @@ func (am *AppManager) SaveProcessInfo() error {
 
 	file, err := os.Create("process_info.json")
 	if err != nil {
-		return err
+		log.Errorf("创建进程信息文件失败: %v\n", err)
+		return irr.Wrap(err, "error creating process info file")
 	}
 	defer file.Close()
 
-	return json.NewEncoder(file).Encode(data)
+	err = json.NewEncoder(file).Encode(data)
+	if err != nil {
+		log.Errorf("写入进程信息文件失败: %v\n", err)
+		return irr.Wrap(err, "error writing process info file")
+	}
+
+	return nil
 }
 
 // LoadProcessInfo 从文件加载进程信息
-func (am *AppManager) LoadProcessInfo() error {
-	am.printer.PrintVerbose("正在加载进程信息缓存文件\n")
+func (am *AppManager) LoadProcessInfo(ctx context.Context) error {
+	log := wlog.From(ctx, "load_process_info")
+	log.Tracef("正在加载进程信息缓存文件\n")
 	file, err := os.Open("process_info.json")
 	if err != nil {
 		if os.IsNotExist(err) {
-			am.printer.PrintVerbose("缓存文件不存在，跳过加载\n")
+			log.Tracef("缓存文件不存在，跳过加载\n")
 			return nil // 文件不存在，不是错误
 		}
-		return err
+		return irr.Wrap(err, "error opening process info file")
 	}
 	defer file.Close()
 
 	var data map[string]ProcessInfo
 	if err := json.NewDecoder(file).Decode(&data); err != nil {
-		return err
+		return irr.Wrap(err, "error decoding process info file")
 	}
 
 	for name, info := range data {
 		if app, ok := am.Apps[name]; ok {
-			am.printer.PrintVerbose("从缓存加载应用 %s 的 PID: %d\n", name, info.Pid)
+			log.Tracef("从缓存加载应用 %s 的 PID: %d\n", name, info.Pid)
 			app.Pid = info.Pid
 		}
 	}
@@ -141,7 +160,9 @@ func (am *AppManager) LoadProcessInfo() error {
 }
 
 // GetAllAppNames 获取所有应用程序名称
-func (am *AppManager) GetAllAppNames() []string {
+func (am *AppManager) GetAllAppNames(ctx context.Context) []string {
+	log := wlog.From(ctx, "GetAllAppNames")
+	log.Tracef("获取所有应用程序名称\n")
 	am.mu.Lock()
 	defer am.mu.Unlock()
 	names := make([]string, 0, len(am.Apps))
@@ -152,7 +173,9 @@ func (am *AppManager) GetAllAppNames() []string {
 }
 
 // MatchAppNames 匹配应用名称
-func (am *AppManager) MatchAppNames(patterns []string) []string {
+func (am *AppManager) MatchAppNames(ctx context.Context, patterns []string) []string {
+	log := wlog.From(ctx, "MatchAppNames")
+	log.Tracef("匹配应用名称\n")
 	var matchedNames []string
 	for _, pattern := range patterns {
 		for name := range am.Apps {
@@ -166,7 +189,9 @@ func (am *AppManager) MatchAppNames(patterns []string) []string {
 }
 
 // pathToDetectedLogFile 确定日志文件路径
-func (am *AppManager) pathToDetectedLogFile(appName string) (logFile string) {
+func (am *AppManager) pathToDetectedLogFile(ctx context.Context, appName string) (logFile string) {
+	log := wlog.From(ctx, "pathToDetectedLogFile")
+	log.Tracef("确定日志文件路径\n")
 	// 不加锁，外部调用者加锁
 	app, ok := am.Apps[appName]
 	if !ok {
