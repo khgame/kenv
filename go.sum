@@ -8,6 +8,10 @@ github.com/khicago/irr v0.0.0-20240309052027-df085c2216f6 h1:rtA26tT0ggG/veBxkhH
 github.com/khicago/irr v0.0.0-20240309052027-df085c2216f6/go.mod h1:Xkg7IeaDuUdIGXfCYmJqMnxXznPAaRC50pGoyc4DcGQ=
 github.com/khicago/wlog v0.0.0-20240921173251-e7983e8ecc1f h1:zW8Xd0grPUJ9fYJC6U3LdWwUDic3/Xcrm6QC9QL2XWY=
 github.com/khicago/wlog v0.0.0-20240921173251-e7983e8ecc1f/go.mod h1:wbJoF5C5OA0CH03EW0zDFTxFnuVWs73gNzUTS/1AbKk=
+github.com/khicago/wlog v0.0.0-20240922080530-225d49d9a876 h1:w42AIlEFTaXXLoEesOa0i1yAheBDFM1x/R5APaFHBwc=
+github.com/khicago/wlog v0.0.0-20240922080530-225d49d9a876/go.mod h1:wbJoF5C5OA0CH03EW0zDFTxFnuVWs73gNzUTS/1AbKk=
+github.com/khicago/wlog v0.0.0-20240922095456-a14a529b9664 h1:Yz+kcKepknwzWg15T+MAzWzCDWOFHVR5lUAvLVc0aNs=
+github.com/khicago/wlog v0.0.0-20240922095456-a14a529b9664/go.mod h1:wbJoF5C5OA0CH03EW0zDFTxFnuVWs73gNzUTS/1AbKk=
 github.com/mattn/go-colorable v0.1.13 h1:fFA4WZxdEF4tXPZVKMLwD8oUnCTTo08duU7wxecdEvA=
 github.com/mattn/go-colorable v0.1.13/go.mod h1:7S9/ev0klgBDR4GtXTXX8a3vIGJpMovkB8vQcUbaXHg=
 github.com/mattn/go-isatty v0.0.16/go.mod h1:kYGgaQfpe5nmfYZH+SKPsOc2e4SrIfOl2e/yFXSvRLM=

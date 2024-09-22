@@ -18,67 +18,67 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-// ListApps 列出所有正在运行的应用程序
-func (am *AppManager) ListApps() {
-	log := wlog.Common("list_apps")
+// ListApps list all running apps
+func (am *AppManager) ListApps(ctx context.Context) {
+	log, ctx := wlog.By(ctx, "ListApps").Branch()
 	am.mu.Lock()
 	defer am.mu.Unlock()
-	log.Tracef("正在列出所有应用\n")
+	log.Tracef("正在列出所有应用")
 	for name, app := range am.Apps {
-		isRunning, pid, isManagedByKenv := am.checkProcessStatus(app)
-		log.Tracef("应用 %s: 运行状态=%v, PID=%d, 由kenv管理=%v\n", name, isRunning, pid, isManagedByKenv)
+		isRunning, pid, isManagedByKenv := am.checkProcessStatus(ctx, app)
+		log.Tracef("应用 %s: 运行状态=%v, PID=%d, 由kenv管理=%v", name, isRunning, pid, isManagedByKenv)
 	}
 	am.printer.PrintSeparator()
-	am.printer.PrintAppList(am.Apps, am.checkProcessStatus)
+	am.printer.PrintAppList(ctx, am.Apps, am.checkProcessStatus)
 	am.printer.PrintSeparator()
 }
 
-// checkProcessStatus 检查进程状态
-func (am *AppManager) checkProcessStatus(app *App) (isRunning bool, pid int, isManagedByKenv bool) {
-	log := wlog.Common("check_process_status")
-	log.Tracef("检查应用 %s 的进程状态\n", app.Name)
+// checkProcessStatus check process status
+func (am *AppManager) checkProcessStatus(ctx context.Context, app *App) (isRunning bool, pid int, isManagedByKenv bool) {
+	log, ctx := wlog.By(ctx, "checkProcessStatus").Field("app", app.Name).Branch()
+	log.Tracef("检查应用 %s 的进程状态", app.Name)
 
 	if app.Pid != 0 {
-		log.Tracef("存储的 PID: %d, 正在验证...\n", app.Pid)
-		if am.verifyProcessCommand(app.Pid, app.Executable) {
-			log.Tracef("应用 %s 的进程 (PID: %d) 仍在运行\n", app.Name, app.Pid)
+		log.Tracef("存储的 PID: %d, 正在验证...", app.Pid)
+		if am.verifyProcessCommand(ctx, app.Pid, app.Executable) {
+			log.Tracef("应用 %s 的进程 (PID: %d) 仍在运行", app.Name, app.Pid)
 			return true, app.Pid, true
 		}
-		log.Tracef("存储的 PID %d 无效，清理脏数据\n", app.Pid)
+		log.Tracef("存储的 PID %d 无效，清理脏数据", app.Pid)
 		app.Pid = 0 // 清理脏数据
 	}
 
-	pid, err := FindProcessByName(app.Name, app.Executable, app.Args)
+	pid, err := FindProcessByName(ctx, app.Name, app.Executable, app.Args)
 	if err == nil && pid != 0 {
-		log.Tracef("找到应用 %s 的新进程 (PID: %d)\n", app.Name, pid)
+		log.Tracef("找到应用 %s 的新进程 (PID: %d)", app.Name, pid)
 		app.Pid = pid // 更新 App 结构体中的 Pid
 		return true, pid, false
 	}
 
-	log.Tracef("未找到应用 %s 的运行进程\n", app.Name)
+	log.Tracef("未找到应用 %s 的运行进程", app.Name)
 	return false, 0, false
 }
 
-// 新增方法：验证进程命令
-func (am *AppManager) verifyProcessCommand(pid int, expectedExecutable string) bool {
-	log := wlog.Common("verify_process_command")
+// verifyProcessCommand verify process command
+func (am *AppManager) verifyProcessCommand(ctx context.Context, pid int, expectedExecutable string) bool {
+	log := wlog.By(ctx, "verifyProcessCommand").Fields(wlog.Fields{"pid": pid, "expectedExecutable": expectedExecutable}).Leaf()
 	cmd := exec.Command("ps", "-p", strconv.Itoa(pid), "-o", "comm=")
 	output, err := cmd.Output()
 	if err != nil {
-		log.Tracef("无法获取 PID %d 的命令: %v\n", pid, err)
+		log.Tracef("无法获取 PID %d 的命令: %v", pid, err)
 		return false
 	}
 
 	actualCommand := strings.TrimSpace(string(output))
 	expectedCommand := filepath.Base(expectedExecutable)
 
-	log.Tracef("PID %d 的实际命令: %s, 期望命令: %s\n", pid, actualCommand, expectedCommand)
+	log.Tracef("PID %d 的实际命令: %s, 期望命令: %s", pid, actualCommand, expectedCommand)
 	return actualCommand == expectedCommand
 }
 
-// StartApp 启动指定的应用程序
+// StartApp start specified application
 func (am *AppManager) StartApp(ctx context.Context, name string) error {
-	log := wlog.From(ctx, "start_app")
+	log, ctx := wlog.By(ctx, "StartApp").Field("app", name).Branch()
 	am.mu.Lock()
 	defer am.mu.Unlock()
 	app, ok := am.Apps[name]
@@ -86,7 +86,7 @@ func (am *AppManager) StartApp(ctx context.Context, name string) error {
 		return fmt.Errorf("app %s not found", name)
 	}
 
-	isRunning, _, _ := am.checkProcessStatus(app)
+	isRunning, _, _ := am.checkProcessStatus(ctx, app)
 	if isRunning {
 		return fmt.Errorf("app %s is already running", name)
 	}
@@ -95,7 +95,7 @@ func (am *AppManager) StartApp(ctx context.Context, name string) error {
 	logFilePath := filepath.Join(app.RunDir, "log", fmt.Sprintf("%s.log", app.Name))
 
 	// 创建日志文件
-	logFile, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	logFile, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %v", err)
 	}
@@ -124,13 +124,13 @@ func (am *AppManager) StartApp(ctx context.Context, name string) error {
 	app.Pid = cmd.Process.Pid
 	log.Printf("Started %s with PID %d, logging to %s", app.Name, app.Pid, logFilePath)
 
-	am.saveProcessInfo()
+	am.saveProcessInfo(ctx)
 	return nil
 }
 
-// StopApp 停止指定的应用程序
+// StopApp stop specified application
 func (am *AppManager) StopApp(ctx context.Context, name string, force bool) error {
-	log := wlog.Common("stop_app")
+	log, ctx := wlog.By(ctx, "StopApp").Fields(wlog.Fields{"app": name, "force": force}).Branch()
 	am.mu.Lock()
 	defer am.mu.Unlock()
 	app, ok := am.Apps[name]
@@ -138,7 +138,7 @@ func (am *AppManager) StopApp(ctx context.Context, name string, force bool) erro
 		return fmt.Errorf("app %s not found", name)
 	}
 
-	isRunning, pid, isManagedByKenv := am.checkProcessStatus(app)
+	isRunning, pid, isManagedByKenv := am.checkProcessStatus(ctx, app)
 	if !isRunning {
 		return fmt.Errorf("app %s is not running", name)
 	}
@@ -158,15 +158,14 @@ func (am *AppManager) StopApp(ctx context.Context, name string, force bool) erro
 	}
 
 	app.Pid = 0
-	log.Printf("Stopped %s", app.Name)
+	log.Infof("Stopped %s", app.Name)
 
-	am.saveProcessInfo()
+	am.saveProcessInfo(ctx)
 	return nil
 }
 
-// RestartApp 重启指定的应用程序
+// RestartApp restart specified application
 func (am *AppManager) RestartApp(ctx context.Context, name string, force bool) error {
-
 	err := am.StopApp(ctx, name, force)
 	if err != nil && !strings.Contains(err.Error(), "is not running") {
 		return err
@@ -174,9 +173,9 @@ func (am *AppManager) RestartApp(ctx context.Context, name string, force bool) e
 	return am.StartApp(ctx, name)
 }
 
-// MonitorApps 监控所有应用程序并保持它们运行
+// MonitorApps monitor all apps and keep them running
 func (am *AppManager) MonitorApps(ctx context.Context) {
-	log := wlog.Common("monitor_apps")
+	log, ctx := wlog.Branch(ctx, "MonitorApps")
 	for {
 		am.mu.Lock()
 		for _, app := range am.Apps {
@@ -196,9 +195,9 @@ func (am *AppManager) MonitorApps(ctx context.Context) {
 	}
 }
 
-// TailLog 查看指定应用程序的日志
+// TailLog tail log of specified application
 func (am *AppManager) TailLog(ctx context.Context, name string) error {
-	log, ctx := wlog.FromHold(ctx, "tail_log")
+	log, ctx := wlog.Branch(ctx, "TailLog")
 	log.Tracef("Enter tail log for %s", name)
 	am.mu.Lock()
 	defer am.mu.Unlock()
@@ -214,9 +213,8 @@ func (am *AppManager) TailLog(ctx context.Context, name string) error {
 	return cmd.Run()
 }
 
-// StatApp 提供指定应用程序的详细状态信息
+// StatApp provide detailed status info of specified application
 func (am *AppManager) StatApp(ctx context.Context, name string, multipleApps bool) error {
-
 	am.mu.Lock()
 	defer am.mu.Unlock()
 	app, ok := am.Apps[name]
@@ -224,11 +222,11 @@ func (am *AppManager) StatApp(ctx context.Context, name string, multipleApps boo
 		return fmt.Errorf("app %s not found", name)
 	}
 
-	isRunning, pid, isManagedByKenv := am.checkProcessStatus(app)
-	ports, _ := GetListeningPorts(runtime.GOOS)
+	isRunning, pid, isManagedByKenv := am.checkProcessStatus(ctx, app)
+	ports, _ := GetListeningPorts(ctx, runtime.GOOS)
 	appPorts := ports[strconv.Itoa(pid)]
-	nginxConfig, _ := GetNginxConfig(runtime.GOOS, app.Name)
-	procInfo, _ := GetProcessInfo(runtime.GOOS, pid)
+	nginxConfig, _ := GetNginxConfig(ctx, runtime.GOOS, app.Name)
+	procInfo, _ := GetProcessInfo(ctx, runtime.GOOS, pid)
 
 	am.printer.PrintAppStatus(app, isRunning, pid, isManagedByKenv, appPorts, nginxConfig, procInfo, multipleApps)
 
@@ -242,7 +240,6 @@ type ExternalPort struct {
 }
 
 func parseNginxConfig(config string) []ExternalPort {
-
 	var externalPorts []ExternalPort
 	lines := strings.Split(config, "\n")
 	var currentPort ExternalPort
@@ -272,10 +269,12 @@ func parseNginxConfig(config string) []ExternalPort {
 	return externalPorts
 }
 
-// 新增方法：保存进程信息到文件
-func (am *AppManager) saveProcessInfo() error {
-
+// saveProcessInfo save process info to file
+func (am *AppManager) saveProcessInfo(ctx context.Context) error {
+	log := wlog.By(ctx, "saveProcessInfo").Leaf()
 	data := make(map[string]ProcessInfo)
+
+	log.Tracef("正在保存进程信息缓存文件")
 	for name, app := range am.Apps {
 		if app.Pid != 0 {
 			data[name] = ProcessInfo{
@@ -294,14 +293,14 @@ func (am *AppManager) saveProcessInfo() error {
 	return json.NewEncoder(file).Encode(data)
 }
 
-// 新增方法：从文件加载进程信息
-func (am *AppManager) loadProcessInfo() error {
-	log := wlog.Common("load_process_info")
-	log.Tracef("正在加载进程信息缓存文件\n")
+// loadProcessInfo load process info from file
+func (am *AppManager) loadProcessInfo(ctx context.Context) error {
+	log := wlog.By(ctx, "loadProcessInfo").Leaf()
+	log.Tracef("正在加载进程信息缓存文件")
 	file, err := os.Open("process_info.json")
 	if err != nil {
 		if os.IsNotExist(err) {
-			log.Tracef("缓存文件不存在，跳过加载\n")
+			log.Tracef("缓存文件不存在，跳过加载")
 			return nil // 文件不存在，不是错误
 		}
 		return err
@@ -315,7 +314,7 @@ func (am *AppManager) loadProcessInfo() error {
 
 	for name, info := range data {
 		if app, ok := am.Apps[name]; ok {
-			log.Tracef("从缓存加载应用 %s 的 PID: %d\n", name, info.Pid)
+			log.Tracef("从缓存加载应用 %s 的 PID: %d", name, info.Pid)
 			app.Pid = info.Pid
 		}
 	}
@@ -323,9 +322,9 @@ func (am *AppManager) loadProcessInfo() error {
 	return nil
 }
 
-// 新增批量操作方法
+// BatchStartApps batch start apps
 func (am *AppManager) BatchStartApps(ctx context.Context, patterns []string) error {
-	log, ctx := wlog.FromHold(ctx, "batch_start_apps")
+	log, ctx := wlog.Branch(ctx, "BatchStartApps")
 	names := am.matchAppNames(patterns)
 	if len(names) == 0 {
 		// 提示支持的应用程序
@@ -341,31 +340,33 @@ func (am *AppManager) BatchStartApps(ctx context.Context, patterns []string) err
 	return nil
 }
 
+// BatchStopApps batch stop apps
 func (am *AppManager) BatchStopApps(ctx context.Context, patterns []string, force bool) error {
-	log := wlog.Common("batch_stop_apps")
+	log := wlog.By(ctx, "BatchStopApps").Fields(wlog.Fields{"patterns": patterns, "force": force}).Leaf()
 	names := am.matchAppNames(patterns)
 	for _, name := range names {
 		err := am.StopApp(ctx, name, force)
 		if err != nil {
-			log.Printf("Error stopping %s: %v", name, err)
+			log.Errorf("Error stopping %s: %v", name, err)
 		}
 	}
 	return nil
 }
 
+// BatchRestartApps batch restart apps
 func (am *AppManager) BatchRestartApps(ctx context.Context, patterns []string, force bool) error {
-	log := wlog.Common("batch_restart_apps")
+	log, ctx := wlog.By(ctx, "BatchRestartApps").Fields(wlog.Fields{"patterns": patterns, "force": force}).Branch()
 	names := am.matchAppNames(patterns)
 	for _, name := range names {
 		err := am.RestartApp(ctx, name, force)
 		if err != nil {
-			log.Printf("Error restarting %s: %v", name, err)
+			log.Errorf("Error restarting %s: %v", name, err)
 		}
 	}
 	return nil
 }
 
-// 新增方法：匹配应用名称
+// matchAppNames match app names
 func (am *AppManager) matchAppNames(patterns []string) []string {
 	var matchedNames []string
 	for _, pattern := range patterns {
@@ -379,9 +380,9 @@ func (am *AppManager) matchAppNames(patterns []string) []string {
 	return uniqueStrings(matchedNames)
 }
 
-// 新增方法：批量获取应用状态
+// BatchStatApps batch get app status
 func (am *AppManager) BatchStatApps(ctx context.Context, patterns []string) error {
-	log, ctx := wlog.FromHold(ctx, "batch_stat_apps")
+	log, ctx := wlog.By(ctx, "BatchStatApps").Field("patterns", patterns).Branch()
 	log.Tracef("Enter batch stat apps")
 	names := am.matchAppNames(patterns)
 	for i, name := range names {
@@ -398,6 +399,10 @@ func (am *AppManager) BatchStatApps(ctx context.Context, patterns []string) erro
 
 func main() {
 	manager := NewAppManager()
+	logger := initLogger()
+	wlog.SetEntryMaker(func(ctx context.Context) *logrus.Entry {
+		return logger.WithContext(ctx)
+	})
 
 	app := &cli.App{
 		Name:  "kenv",
@@ -414,7 +419,7 @@ func main() {
 				Name:  "list",
 				Usage: "List all applications",
 				Action: func(c *cli.Context) error {
-					manager.ListApps()
+					manager.ListApps(c.Context)
 					return nil
 				},
 			},
@@ -485,22 +490,23 @@ func main() {
 			},
 		},
 		Before: func(c *cli.Context) error {
-			SetVerbose(c.Bool("verbose"))
-			wlog.DefaultWLog.SetLevel(logrus.TraceLevel)
+			if c.Bool("verbose") {
+				logger.SetLevel(logrus.TraceLevel)
+				manager.printer.PrintVerbose("详细模式已启用\n")
+			}
 
-			manager.printer.PrintVerbose("详细模式已启用\n")
 			if err := manager.LoadConfig(c.Context, ConfFile); err != nil {
 				return err
 			}
-			return manager.loadProcessInfo()
+			return manager.loadProcessInfo(c.Context)
 		},
 		After: func(c *cli.Context) error {
-			return manager.saveProcessInfo()
+			return manager.saveProcessInfo(c.Context)
 		},
 		Action: func(c *cli.Context) error {
 			cli.ShowAppHelp(c)
 			manager.printer.PrintInfo("\nCurrent application status:")
-			manager.ListApps()
+			manager.ListApps(c.Context)
 			return nil
 		},
 	}

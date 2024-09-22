@@ -12,7 +12,7 @@ require (
 require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
 	github.com/khicago/irr v0.0.0-20240309052027-df085c2216f6 // indirect
-	github.com/khicago/wlog v0.0.0-20240921173251-e7983e8ecc1f // indirect
+	github.com/khicago/wlog v0.0.0-20240922095456-a14a529b9664 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.9 // indirect

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -19,7 +20,7 @@ func NewPrinter() *Printer {
 }
 
 // PrintAppList 打印应用程序列表
-func (p *Printer) PrintAppList(apps map[string]*App, checkStatus func(*App) (bool, int, bool)) {
+func (p *Printer) PrintAppList(ctx context.Context, apps map[string]*App, checkStatus func(context.Context, *App) (bool, int, bool)) {
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader([]string{"Name", "Status", "PID", "Managed By"})
 	table.SetBorder(false)
@@ -28,7 +29,7 @@ func (p *Printer) PrintAppList(apps map[string]*App, checkStatus func(*App) (boo
 	table.SetRowSeparator("")
 
 	for _, app := range apps {
-		isRunning, pid, isManagedByKenv := checkStatus(app)
+		isRunning, pid, isManagedByKenv := checkStatus(ctx, app)
 		status := color.RedString("Not Running")
 		pidStr := "-"
 		managedBy := "-"
@@ -96,7 +97,7 @@ func (p *Printer) PrintAppStatus(app *App, isRunning bool, pid int, isManagedByK
 	}
 }
 
-// PrintError 打印错误信息
+// PrintError print error info
 func (p *Printer) PrintError(format string, a ...interface{}) {
 	color.Red(format, a...)
 }
@@ -106,18 +107,18 @@ func (p *Printer) PrintSuccess(format string, a ...interface{}) {
 	color.Green(format, a...)
 }
 
-// PrintInfo 打印一般信息
+// PrintInfo print info
 func (p *Printer) PrintInfo(format string, a ...interface{}) {
 	color.Blue(format, a...)
 }
 
-// PrintVerbose 打印详细日志信息
+// PrintVerbose print verbose info
 func (p *Printer) PrintVerbose(format string, a ...interface{}) {
 	gray := color.New(color.FgHiBlack).SprintfFunc()
 	fmt.Print(gray(format, a...))
 }
 
-// PrintSeparator 打印分隔线
+// PrintSeparator print separator
 func (p *Printer) PrintSeparator() {
 	fmt.Println(strings.Repeat("-", 50))
 }
